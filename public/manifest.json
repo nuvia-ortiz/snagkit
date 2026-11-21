@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Snagkit — QA toolkit",
+  "short_name": "Snagkit",
+  "version": "0.1.0",
+  "description": "One-click bug reports with screenshot, steps, console errors and failed requests. 100% local.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Snagkit",
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "unlimitedStorage", "scripting", "webRequest"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["page-hooks.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["recorder.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
