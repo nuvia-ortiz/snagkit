@@ -74,10 +74,19 @@ const ICONS: Record<Tool, string> = {
   blur: "M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z",
 };
 
-export function Annotator({ src, labels, ref }: { src: string; labels: Labels; ref?: Ref<AnnotatorApi> }) {
+type Props = { src: string; labels: Labels; highlight?: { x: number; y: number; w: number; h: number }; ref?: Ref<AnnotatorApi> };
+
+/** Recuadro inicial alrededor del elemento señalado por otro módulo, con un poco de margen. */
+function initialShapes(h: Props["highlight"]): Shape[] {
+  if (!h) return [];
+  const pad = 8;
+  return [{ tool: "rect", color: COLORS[0], from: { x: h.x - pad, y: h.y - pad }, to: { x: h.x + h.w + pad, y: h.y + h.h + pad } }];
+}
+
+export function Annotator({ src, labels, highlight, ref }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [shapes, setShapes] = useState<Shape[]>(() => initialShapes(highlight));
   const [draft, setDraft] = useState<Shape | null>(null);
   const [tool, setTool] = useState<Tool>("rect");
   const [color, setColor] = useState(COLORS[0]);

@@ -26,13 +26,35 @@ const SHOP = `<!doctype html>
   </script>
 </body></html>`;
 
-type Fixtures = { context: BrowserContext; serviceWorker: Worker; extensionId: string; baseUrl: string };
+/** Formulario de registro con errores típicos para el probador de formularios. */
+const SIGNUP = `<!doctype html>
+<html lang="en"><head><title>Sign up</title></head>
+<body style="font-family:sans-serif;padding:40px;max-width:520px">
+  <h1>Create your account</h1>
+  <form id="signup" aria-label="Sign up" method="post" action="/signup">
+    <p><input name="fullname" placeholder="Full name"></p>
+    <p><label for="email">Email</label><input id="email" name="email" type="text" value="keep@me.com"></p>
+    <p><label for="phone">Phone</label><input id="phone" name="phone" autocomplete="tel"></p>
+    <p><input name="company"></p>
+    <p><label for="nowhere">Newsletter</label></p>
+    <p><button type="submit"><svg width="16" height="16"></svg></button></p>
+  </form>
+</body></html>`;
+
+type Fixtures = { context: BrowserContext; serviceWorker: Worker; extensionId: string; baseUrl: string; submissions: string[] };
 
 export const test = base.extend<Fixtures>({
   // eslint-disable-next-line no-empty-pattern
-  baseUrl: async ({}, use) => {
+  submissions: async ({}, use) => {
+    await use([]);
+  },
+
+  baseUrl: async ({ submissions }, use) => {
     const server: Server = createServer((req, res) => {
-      if (req.url === "/") {
+      if (req.method === "POST" && req.url === "/signup") submissions.push(req.url);
+      if (req.url === "/signup") {
+        res.writeHead(200, { "content-type": "text/html" }).end(SIGNUP);
+      } else if (req.url === "/") {
         res.writeHead(200, { "content-type": "text/html" }).end(SHOP);
       } else if (req.url?.startsWith("/api/pay")) {
         res.writeHead(500, { "content-type": "application/json" }).end('{"error":"boom"}');

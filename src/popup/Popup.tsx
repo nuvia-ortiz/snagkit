@@ -71,6 +71,13 @@ export function Popup() {
     }
   };
 
+  const runForms = async () => {
+    if (!tab?.id) return;
+    const res = await send<{ ok: boolean; error?: string }>({ type: "runFormTester", tabId: tab.id });
+    if (res.ok) window.close();
+    else setNotice(res.error ?? "Error");
+  };
+
   const clear = async () => {
     if (!tab?.id) return;
     await send({ type: "clearSession", tabId: tab.id });
@@ -158,12 +165,24 @@ export function Popup() {
 
       <section className="mt-4 border-t border-line pt-3">
         <h2 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500">{t.modules}</h2>
-        {[t.forms, t.stress].map((name) => (
-          <div key={name} className="flex items-center justify-between py-1.5 text-sm text-zinc-500">
-            <span>{name}</span>
-            <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase">{t.soon}</span>
+        <div className="flex items-center justify-between gap-3 py-1.5">
+          <div>
+            <p className="text-sm text-zinc-200">{t.forms}</p>
+            <p className="text-[11px] text-zinc-500">{t.formsHint}</p>
           </div>
-        ))}
+          <button
+            type="button"
+            disabled={!supported}
+            onClick={runForms}
+            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-accent hover:text-accent disabled:opacity-40"
+          >
+            {t.run}
+          </button>
+        </div>
+        <div className="flex items-center justify-between py-1.5 text-sm text-zinc-500">
+          <span>{t.stress}</span>
+          <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase">{t.soon}</span>
+        </div>
       </section>
 
       <p className="mt-3 text-center text-[11px] text-zinc-600">🔒 {t.local}</p>

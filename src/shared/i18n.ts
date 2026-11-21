@@ -18,6 +18,8 @@ const en = {
   recordingHint: "Use the page as usual. Snagkit is writing down every step.",
   modules: "Tools",
   forms: "Form tester",
+  formsHint: "Checks labels, types and validation. Never submits.",
+  run: "Run",
   stress: "UI stress test",
   soon: "Soon",
   local: "Everything stays on your computer.",
@@ -92,6 +94,8 @@ const es: Dict = {
   recordingHint: "Usa la página con normalidad. Snagkit va anotando cada paso.",
   modules: "Herramientas",
   forms: "Probador de formularios",
+  formsHint: "Revisa etiquetas, tipos y validación. Nunca envía.",
+  run: "Ejecutar",
   stress: "Test de estrés visual",
   soon: "Pronto",
   local: "Todo se queda en tu ordenador.",
@@ -153,7 +157,7 @@ const ROLE_NAMES: Record<Lang, Record<string, string>> = {
   es: { field: "campo", button: "botón", link: "enlace", dropdown: "desplegable", checkbox: "casilla", radio: "opción", image: "imagen", label: "etiqueta", heading: "título", form: "formulario" },
 };
 
-function target(t: Target, lang: Lang): string {
+export function targetText(t: Target, lang: Lang): string {
   const role = ROLE_NAMES[lang][t.role] ?? t.role;
   return t.label ? `${role} "${t.label}"` : role;
 }
@@ -165,21 +169,21 @@ export function stepText(step: Step, lang: Lang): string {
     case "navigate":
       return es ? `Abrir ${step.url}` : `Open ${step.url}`;
     case "click":
-      return es ? `Pulsar ${target(step.target, lang)}` : `Click ${target(step.target, lang)}`;
+      return es ? `Pulsar ${targetText(step.target, lang)}` : `Click ${targetText(step.target, lang)}`;
     case "type":
-      return es ? `Escribir en ${target(step.target, lang)}` : `Type in ${target(step.target, lang)}`;
+      return es ? `Escribir en ${targetText(step.target, lang)}` : `Type in ${targetText(step.target, lang)}`;
     case "select":
       return es
-        ? `Elegir "${step.value}" en ${target(step.target, lang)}`
-        : `Select "${step.value}" in ${target(step.target, lang)}`;
+        ? `Elegir "${step.value}" en ${targetText(step.target, lang)}`
+        : `Select "${step.value}" in ${targetText(step.target, lang)}`;
     case "check":
       return es
-        ? `${step.checked ? "Marcar" : "Desmarcar"} ${target(step.target, lang)}`
-        : `${step.checked ? "Check" : "Uncheck"} ${target(step.target, lang)}`;
+        ? `${step.checked ? "Marcar" : "Desmarcar"} ${targetText(step.target, lang)}`
+        : `${step.checked ? "Check" : "Uncheck"} ${targetText(step.target, lang)}`;
     case "submit":
-      return es ? `Enviar ${target(step.target, lang)}` : `Submit ${target(step.target, lang)}`;
+      return es ? `Enviar ${targetText(step.target, lang)}` : `Submit ${targetText(step.target, lang)}`;
     case "key":
-      return es ? `Pulsar la tecla ${step.key} en ${target(step.target, lang)}` : `Press ${step.key} in ${target(step.target, lang)}`;
+      return es ? `Pulsar la tecla ${step.key} en ${targetText(step.target, lang)}` : `Press ${step.key} in ${targetText(step.target, lang)}`;
   }
 }
 

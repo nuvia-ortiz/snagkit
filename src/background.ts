@@ -3,7 +3,7 @@
 
 import { parseBrowser, parseOs } from "./shared/report";
 import { addEntry, addStep, emptySession } from "./shared/session";
-import type { Environment, Message, NetworkEntry, ReportDraft, TabSession } from "./shared/types";
+import type { Environment, Message, NetworkEntry, Prefill, Rect, ReportDraft, TabSession } from "./shared/types";
 
 const key = (tabId: number) => `tab:${tabId}`;
 const cache = new Map<number, TabSession>();
@@ -136,6 +136,19 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
     case "step":
       if (tabId !== undefined) void ready.then(() => (recording ? update(tabId, (s) => addStep(s, message.step)) : undefined));
       return false;
+    case "reportFromPage":
+      if (tabId === undefined || sender.tab?.windowId === undefined) return false;
+      createReport(tabId, sender.tab.windowId, { prefill: message.prefill, highlight: message.highlight }).then(
+        (id) => sendResponse({ ok: true, id }),
+        (error: unknown) => sendResponse({ ok: false, error: String(error) }),
+      );
+      return true;
+    case "runFormTester":
+      chrome.scripting.executeScript({ target: { tabId: message.tabId }, files: ["form-tester.js"] }).then(
+        () => sendResponse({ ok: true }),
+        (error: unknown) => sendResponse({ ok: false, error: String(error) }),
+      );
+      return true;
     case "setRecording":
       setRecording(message.on).then(
         () => sendResponse(true),
@@ -172,7 +185,7 @@ function readPageEnvironment() {
   };
 }
 
-async function createReport(tabId: number, windowId: number): Promise<string> {
+async function createReport(tabId: number, windowId: number, extra: { prefill?: Prefill; highlight?: Rect } = {}): Promise<string> {
   const screenshot = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
   const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: readPageEnvironment });
   if (!result) throw new Error("No se pudo leer la página");
@@ -191,6 +204,14 @@ async function createReport(tabId: number, windowId: number): Promise<string> {
     screenshot,
     env,
     session: await getSession(tabId),
+    prefill: extra.prefill,
+    // El recuadro llega en píxeles CSS; la captura está en píxeles físicos.
+    highlight: extra.highlight && {
+      x: extra.highlight.x * result.pixelRatio,
+      y: extra.highlight.y * result.pixelRatio,
+      w: extra.highlight.w * result.pixelRatio,
+      h: extra.highlight.h * result.pixelRatio,
+    },
   };
 
   await chrome.storage.local.set({ [`report:${draft.id}`]: draft });

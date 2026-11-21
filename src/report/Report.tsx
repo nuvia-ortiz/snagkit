@@ -43,7 +43,16 @@ export function Report() {
   useEffect(() => {
     if (!id) return setDraft(null);
     chrome.storage.local.get([`report:${id}`, "githubRepo"]).then((data) => {
-      setDraft((data[`report:${id}`] as ReportDraft | undefined) ?? null);
+      const loaded = (data[`report:${id}`] as ReportDraft | undefined) ?? null;
+      setDraft(loaded);
+      if (loaded?.prefill) {
+        const { title, description, severity, steps, expected } = loaded.prefill;
+        setForm((f) => ({ ...f, title, description, severity, expected: expected ?? f.expected }));
+        if (steps) {
+          setStepsEdited(true);
+          setForm((f) => ({ ...f, steps }));
+        }
+      }
       if (typeof data.githubRepo === "string") setRepo(data.githubRepo);
     });
   }, [id]);
@@ -112,7 +121,7 @@ export function Report() {
       <main className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0 space-y-6">
           <section className="rounded-xl border border-line bg-panel/40 p-4">
-            <Annotator ref={annotator} src={draft.screenshot} labels={{ tools: t.tools, undo: t.undo, clearMarks: t.clearMarks, screenshot: t.screenshot }} />
+            <Annotator ref={annotator} src={draft.screenshot} highlight={draft.highlight} labels={{ tools: t.tools, undo: t.undo, clearMarks: t.clearMarks, screenshot: t.screenshot }} />
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">

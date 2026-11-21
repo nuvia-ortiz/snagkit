@@ -48,12 +48,20 @@ export type Environment = {
   timestamp: string;
 };
 
+export type Rect = { x: number; y: number; w: number; h: number };
+
+/** Datos que otro módulo (p. ej. el probador de formularios) deja ya escritos en el reporte. */
+export type Prefill = { title: string; description: string; severity: Severity; steps?: string; expected?: string };
+
 export type ReportDraft = {
   id: string;
   createdAt: number;
   screenshot: string;
   env: Environment;
   session: TabSession;
+  prefill?: Prefill;
+  /** Zona a recuadrar en la captura, en píxeles de la imagen. */
+  highlight?: Rect;
 };
 
 export type Severity = "critical" | "high" | "medium" | "low";
@@ -75,6 +83,8 @@ export type Message =
   | { type: "getSession"; tabId: number }
   | { type: "clearSession"; tabId: number }
   | { type: "createReport"; tabId: number; windowId: number }
-  | { type: "setRecording"; on: boolean };
+  | { type: "setRecording"; on: boolean }
+  | { type: "reportFromPage"; prefill: Prefill; highlight?: Rect }
+  | { type: "runFormTester"; tabId: number };
 
 export const LIMITS = { console: 50, network: 50, steps: 30 } as const;

@@ -50,6 +50,8 @@ if (window === window.top && !w[LOADED]) {
     "click",
     (event) => {
       if (!event.isTrusted || !(event.target instanceof Element)) return;
+      // Clics en los paneles de Snagkit (probador de formularios, etc.) no son pasos del usuario.
+      if (event.target.closest("snagkit-forms, snagkit-stress")) return;
       const el = closestInteractive(event.target);
       // Los clics en campos de texto y desplegables ya se reflejan como "escribir" o "elegir".
       if (el.matches('select, textarea, input:not([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="reset"], [type="image"])'))
@@ -86,6 +88,8 @@ if (window === window.top && !w[LOADED]) {
   document.addEventListener(
     "input",
     (event) => {
+      // El probador de formularios escribe valores de prueba con eventos sintéticos: no cuentan.
+      if (!event.isTrusted) return;
       const el = event.target;
       const isText =
         (el instanceof HTMLInputElement && !["checkbox", "radio", "file", "range", "color"].includes(el.type)) ||

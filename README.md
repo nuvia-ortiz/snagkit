@@ -25,9 +25,24 @@ Writing a good bug report takes time: reproduce it, take a screenshot, open DevT
 - **Export** as Markdown, Jira markup, PNG or `.md`, or open a pre-filled GitHub issue.
 - **English and Spanish** interface and reports.
 
-### 📝 Form tester (coming soon)
+### 📝 Form tester (available)
 
-Finds every form on the page and tries empty, invalid and extreme values, then lists the fields that accept bad data, show no error message or have no accessible label.
+Finds every form on the page and checks it **without ever submitting it**:
+
+| Check | Severity |
+|---|---|
+| Field has no label (no `<label>`, `aria-label` or `aria-labelledby`) | Error |
+| Placeholder used as the only label | Warning |
+| Email, phone, URL or number field declared as `type="text"` | Warning |
+| Personal data field without `autocomplete` (WCAG 1.3.5) | Warning |
+| Field accepts an invalid value (`test@` as email, `abcdef` as phone…) without any error | Error |
+| Button with no accessible name | Error |
+| Form without a submit button | Warning |
+| `<label for>` pointing to a field that doesn't exist | Error |
+| Duplicate field ids | Error |
+| Password field on a page or form without HTTPS | Error |
+
+To test validation, Snagkit types an invalid value, waits for the page to react (native validation, `aria-invalid`, an error class or a new error message) and then **puts the original value back**. Results appear in a panel on the page with every problem outlined; **Report** turns any of them into a bug report with the field boxed in the screenshot and the steps already written.
 
 ### 💥 UI stress test (coming soon)
 
@@ -97,7 +112,7 @@ The end-to-end test opens a sample checkout page, fills in the form, triggers a 
 
 - [x] Bug reports with steps, console, network, environment and annotated screenshot
 - [x] Start / pause recording
-- [ ] Form tester
+- [x] Form tester
 - [ ] UI stress test
 - [ ] Short screen recording of the last seconds before the bug
 - [ ] Chrome Web Store release
