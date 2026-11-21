@@ -52,6 +52,23 @@ describe("analyzeForms() static checks", () => {
   });
 });
 
+describe("autocomplete checks", () => {
+  it("suggests the exact token, skips the second surname and flags autocomplete=off", async () => {
+    document.body.innerHTML = `
+      <form aria-label="Pago">
+        <label for="n">Nombre *</label><input id="n" name="f[nombre]" autocomplete="given-name">
+        <label for="a1">Apellido *</label><input id="a1" name="f[primer_apellido]">
+        <label for="a2">2º Apellido</label><input id="a2" name="f[segundo_apellido]">
+        <label for="d">Dirección *</label><input id="d" name="f[direccion]">
+        <label for="e">Email *</label><input id="e" name="f[email]" type="email" autocomplete="off">
+        <button>Pagar</button>
+      </form>`;
+    const [form] = await analyzeForms(document, { probe: false });
+    const ac = form.issues.filter((i) => i.rule.startsWith("autocomplete") || i.rule === "no-autocomplete").map((i) => `${i.rule}:${i.target.label}=${i.detail}`);
+    expect(ac).toEqual(["no-autocomplete:Apellido *=family-name", "no-autocomplete:Dirección *=street-address", "autocomplete-off:Email *=email"]);
+  });
+});
+
 describe("kindOf()", () => {
   it("guesses what a field is for from its name, label or type", () => {
     document.body.innerHTML = `
@@ -59,6 +76,8 @@ describe("kindOf()", () => {
       <input id="d" name="user_website"><input id="e" name="comment">`;
     const k = (id: string) => kindOf(document.getElementById(id)!);
     expect([k("a"), k("b"), k("c"), k("d"), k("e")]).toEqual(["email", "tel", "email", "url", null]);
+    document.body.innerHTML = '<label for="u">Username or email address</label><input id="u" name="login">';
+    expect(k("u")).toBeNull();
   });
 });
 
@@ -75,6 +94,42 @@ describe("validation probing", () => {
     const invalid = contact.issues.filter((i) => i.rule === "accepts-invalid").map((i) => `${i.target.label}=${i.detail}`);
     expect(invalid).toEqual(["Email again=test@"]);
     expect((document.getElementById("e1") as HTMLInputElement).value).toBe("kept@example.com");
+  });
+
+  it("ignores text that changes elsewhere in the form (loading dropdowns, live prices)", async () => {
+    document.body.innerHTML = `
+      <form>
+        <label for="em">Email</label><input id="em" name="email">
+        <label for="mk">Make</label><select id="mk"><option>Loading…</option></select>
+        <p>Total: <span id="total">0 €</span></p>
+      </form>`;
+    const field = document.getElementById("em") as HTMLInputElement;
+    // Algo ajeno al campo cambia mientras se prueba
+    field.addEventListener("input", () => {
+      document.getElementById("total")!.textContent = "123 €";
+      document.querySelector("#mk option")!.textContent = "BMW";
+    });
+    expect(await probeRejects(field, "test@")).toBe(false);
+  });
+
+  it("detects an error message added next to the field (jQuery Validate style)", async () => {
+    document.body.innerHTML = `
+      <form><div class="row">
+        <label for="em">Email</label><input id="em" name="email">
+        <label for="ph">Phone</label><input id="ph" name="phone">
+      </div></form>`;
+    const field = document.getElementById("em") as HTMLInputElement;
+    field.addEventListener("focusout", () => {
+      if (field.value.includes("@") && !/@.+\./.test(field.value)) field.insertAdjacentHTML("afterend", '<label class="error" for="em">Please enter a valid email.</label>');
+    });
+    expect(await probeRejects(field, "test@")).toBe(true);
+  });
+
+  it("detects a has-error class on the field's wrapper", async () => {
+    document.body.innerHTML = `<form><div class="form-group" id="g"><label for="t">Phone</label><input id="t" name="phone"></div><input name="other"></form>`;
+    const field = document.getElementById("t") as HTMLInputElement;
+    field.addEventListener("input", () => document.getElementById("g")!.classList.toggle("has-error", /\D/.test(field.value)));
+    expect(await probeRejects(field, "abcdef")).toBe(true);
   });
 
   it("counts custom JavaScript validation (aria-invalid) as a rejection", async () => {

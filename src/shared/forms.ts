@@ -10,6 +10,7 @@ export type FormRule =
   | "placeholder-label"
   | "wrong-type"
   | "no-autocomplete"
+  | "autocomplete-off"
   | "accepts-invalid"
   | "unnamed-button"
   | "no-submit"
@@ -48,7 +49,30 @@ const INVALID_SAMPLES: Partial<Record<Kind, string>> = {
   number: "abc",
 };
 
-const AUTOCOMPLETE_KINDS = new Set<Kind>(["email", "tel", "name", "address", "postal"]);
+/**
+ * Valor de autocomplete recomendado según lo que pide el campo (tokens del estándar HTML).
+ * Devuelve null cuando no existe un token adecuado, como el segundo apellido.
+ */
+export function suggestedAutocomplete(el: Element, kind: Kind | null): string | null {
+  const text = fieldText(el);
+  switch (kind) {
+    case "email":
+      return "email";
+    case "tel":
+      return "tel";
+    case "postal":
+      return "postal-code";
+    case "address":
+      return "street-address";
+    case "name":
+      if (/(2|segund|second)\S*\s*apellido|second(ary)?[ _-]?(last|family)/i.test(text)) return null;
+      if (/apellido|last|family|surname/i.test(text)) return "family-name";
+      if (/first|given|^nombre$|nombre(?!.*apellido)/i.test(text) && !/full|complet/i.test(text)) return "given-name";
+      return "name";
+    default:
+      return null;
+  }
+}
 
 const SKIPPED_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "file", "checkbox", "radio", "range", "color"]);
 
@@ -77,6 +101,8 @@ export function kindOf(el: Element): Kind | null {
   const type = (el as HTMLInputElement).type?.toLowerCase();
   if (type === "email" || type === "tel" || type === "url" || type === "number") return type;
   const text = fieldText(el);
+  // "Usuario o email" admite cosas que no son un email: no se puede exigir formato de email.
+  if (/user|usuario|login|nick/i.test(text) && /e-?mail|correo/i.test(text)) return null;
   for (const [kind, re] of KIND_PATTERNS) if (re.test(text)) return kind;
   return null;
 }
@@ -119,7 +145,10 @@ function staticChecks(form: Element, doc: Document): FormIssue[] {
     if (field instanceof HTMLInputElement && field.type === "text" && kind && ["email", "tel", "url", "number"].includes(kind)) {
       add("wrong-type", "warning", field, kind);
     }
-    if (kind && AUTOCOMPLETE_KINDS.has(kind) && !field.getAttribute("autocomplete")) add("no-autocomplete", "warning", field, kind);
+    const suggestion = suggestedAutocomplete(field, kind);
+    const autocomplete = field.getAttribute("autocomplete")?.trim().toLowerCase();
+    if (suggestion && !autocomplete) add("no-autocomplete", "warning", field, suggestion);
+    else if (suggestion && autocomplete && /^(off|false|no|nope|none|disabled?)$/.test(autocomplete)) add("autocomplete-off", "warning", field, suggestion);
   }
 
   const buttons = inScope(form, 'button, input[type="submit"], input[type="button"], input[type="image"]').filter(isVisible);
@@ -165,22 +194,71 @@ function setNativeValue(field: HTMLInputElement | HTMLTextAreaElement, value: st
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const ERROR_CLASS = /error|invalid|danger/i;
+const ERROR_SELECTOR = '[role="alert"], [aria-live="assertive"], .error, .invalid-feedback, .help-block, [class*="error"], [class*="invalid"]';
+
+/** La caja más grande alrededor del campo que no contiene ningún otro campo (su "zona"). */
+function zoneOf(field: Element): Element {
+  let zone: Element = field;
+  while (zone.parentElement && zone.parentElement.tagName !== "FORM" && zone.parentElement.tagName !== "BODY") {
+    const controls = zone.parentElement.querySelectorAll('input:not([type="hidden"]), select, textarea');
+    if (controls.length > 1) break;
+    zone = zone.parentElement;
+  }
+  return zone;
+}
+
+/** Texto de los mensajes de error visibles del formulario, para detectar los que aparecen nuevos. */
+function errorMessages(scope: Element): Set<string> {
+  const out = new Set<string>();
+  for (const el of scope.querySelectorAll(ERROR_SELECTOR)) {
+    if (el.matches("input, select, textarea, form")) continue;
+    const text = el.textContent?.trim();
+    if (text && isVisible(el)) out.add(text);
+  }
+  return out;
+}
+
+/** Mensaje de error enlazado al campo con aria-describedby o aria-errormessage. */
+function linkedMessage(field: Element): string {
+  const ids = `${field.getAttribute("aria-describedby") ?? ""} ${field.getAttribute("aria-errormessage") ?? ""}`.trim();
+  if (!ids) return "";
+  return ids
+    .split(/\s+/)
+    .map((id) => field.ownerDocument.getElementById(id)?.textContent?.trim() ?? "")
+    .join(" ");
+}
+
 /**
- * Escribe un valor inválido y mira si el formulario lo rechaza de alguna forma:
- * validación nativa del navegador, aria-invalid, una clase de error o un mensaje nuevo.
+ * Escribe un valor inválido y mira si el formulario lo rechaza de alguna forma: validación nativa,
+ * aria-invalid, una clase de error en el campo o su caja, un texto nuevo junto al campo o un mensaje
+ * de error nuevo. Lo que cambie en otras partes del formulario (desplegables que cargan, contadores,
+ * precios) no cuenta: antes daba falsos "rechazado".
  */
 export const probeRejects: Probe = async (field, value) => {
   const original = field.value;
-  const container = field.closest("form, fieldset, [role='group']") ?? field.parentElement ?? field;
-  const textBefore = container.textContent ?? "";
-  const classBefore = field.className;
+  const form = field.closest("form") ?? field.ownerDocument.body;
+  const zone = zoneOf(field);
+  const box = zone.parentElement ?? zone;
+  const before = {
+    zoneText: zone.textContent ?? "",
+    fieldClass: field.className,
+    zoneClass: zone.className,
+    boxClass: box.className,
+    linked: linkedMessage(field),
+    messages: errorMessages(form),
+  };
   try {
     setNativeValue(field, value);
-    await wait(250);
+    await wait(300);
     if (!field.checkValidity()) return true;
     if (field.getAttribute("aria-invalid") === "true") return true;
-    if (field.className !== classBefore && /error|invalid|danger/i.test(field.className)) return true;
-    if ((container.textContent ?? "") !== textBefore) return true;
+    if (field.className !== before.fieldClass && ERROR_CLASS.test(field.className)) return true;
+    if (zone.className !== before.zoneClass && ERROR_CLASS.test(zone.className)) return true;
+    if (box.className !== before.boxClass && ERROR_CLASS.test(box.className)) return true;
+    if ((zone.textContent ?? "") !== before.zoneText) return true;
+    if (linkedMessage(field) !== before.linked) return true;
+    for (const message of errorMessages(form)) if (!before.messages.has(message)) return true;
     // Un <input type="number"> no admite letras: el navegador deja el valor vacío.
     if (field.value === "" && value !== "") return true;
     return false;

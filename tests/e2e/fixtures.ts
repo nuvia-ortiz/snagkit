@@ -69,7 +69,15 @@ export const test = base.extend<Fixtures>({
   baseUrl: async ({ submissions }, use) => {
     const server: Server = createServer((req, res) => {
       if (req.method === "POST" && req.url === "/signup") submissions.push(req.url);
-      if (req.url === "/product") {
+      if (req.url === "/strict") {
+        // La política de seguridad más estricta habitual: nada inline, Trusted Types obligatorio
+        res
+          .writeHead(200, {
+            "content-type": "text/html",
+            "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'",
+          })
+          .end(SIGNUP.replace("<title>Sign up</title>", "<title>Strict</title>"));
+      } else if (req.url === "/product") {
         res.writeHead(200, { "content-type": "text/html" }).end(PRODUCT);
       } else if (req.url === "/signup") {
         res.writeHead(200, { "content-type": "text/html" }).end(SIGNUP);

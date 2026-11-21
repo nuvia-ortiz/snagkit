@@ -73,8 +73,12 @@ export const formsText: Record<Lang, FormsDict> = {
         help: "The field is type=\"text\". Using type=\"{detail}\" shows the right mobile keyboard and adds free browser validation.",
       },
       "no-autocomplete": {
-        title: "Missing autocomplete",
-        help: "Without an autocomplete attribute the browser can't fill in personal data for the user (WCAG 1.3.5).",
+        title: "Missing autocomplete=\"{detail}\"",
+        help: "Chrome may still fill it in by guessing from the field name, but other browsers, password managers and assistive technology rely on the attribute (WCAG 1.3.5). Add autocomplete=\"{detail}\".",
+      },
+      "autocomplete-off": {
+        title: "Autocomplete is switched off",
+        help: "This personal data field has autocomplete turned off, so browsers won't offer saved data. Use autocomplete=\"{detail}\" instead (WCAG 1.3.5).",
       },
       "accepts-invalid": {
         title: "Accepts an invalid value: “{detail}”",
@@ -143,8 +147,12 @@ export const formsText: Record<Lang, FormsDict> = {
         help: "El campo es type=\"text\". Con type=\"{detail}\" el móvil muestra el teclado adecuado y el navegador valida gratis.",
       },
       "no-autocomplete": {
-        title: "Falta autocomplete",
-        help: "Sin el atributo autocomplete el navegador no puede rellenar los datos personales del usuario (WCAG 1.3.5).",
+        title: "Falta autocomplete=\"{detail}\"",
+        help: "Chrome puede rellenarlo igualmente adivinando por el nombre del campo, pero otros navegadores, los gestores de contraseñas y los lectores de pantalla dependen del atributo (WCAG 1.3.5). Añade autocomplete=\"{detail}\".",
+      },
+      "autocomplete-off": {
+        title: "Autocompletado desactivado",
+        help: "Este campo de datos personales tiene el autocompletado apagado, así que el navegador no ofrecerá los datos guardados. Usa autocomplete=\"{detail}\" (WCAG 1.3.5).",
       },
       "accepts-invalid": {
         title: "Acepta un valor inválido: «{detail}»",
