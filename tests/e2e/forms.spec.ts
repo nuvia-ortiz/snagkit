@@ -9,7 +9,8 @@ test("form tester finds problems, never submits, and turns an issue into a repor
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html?tabId=${tabId}`);
   await popup.getByRole("button", { name: "EN" }).click();
   await page.bringToFront();
-  await popup.getByRole("button", { name: "Run" }).click();
+  await popup.getByRole("tab", { name: /Forms/ }).click();
+  await popup.getByRole("button", { name: "Test the forms on this page" }).click();
 
   // El panel vive en un Shadow DOM abierto; los locators de Playwright lo atraviesan.
   const panel = page.getByRole("dialog", { name: "Snagkit" });

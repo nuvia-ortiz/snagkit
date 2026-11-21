@@ -85,6 +85,7 @@ export type Message =
   | { type: "createReport"; tabId: number; windowId: number }
   | { type: "setRecording"; on: boolean }
   | { type: "reportFromPage"; prefill: Prefill; highlight?: Rect }
-  | { type: "runFormTester"; tabId: number };
+  | { type: "runFormTester"; tabId: number }
+  | { type: "runStressTest"; tabId: number };
 
 export const LIMITS = { console: 50, network: 50, steps: 30 } as const;

@@ -4,12 +4,13 @@
 import { analyzeForms, type FormIssue, type FormReport } from "../shared/forms";
 import { detectLang, targetText } from "../shared/i18n";
 import { formsText, ruleText } from "../shared/i18n-forms";
+import { createMarker } from "../shared/marks";
 import type { Lang, Message, Severity } from "../shared/types";
 
 const GLOBAL = "__snagkitForms__";
 const COLORS = { error: "#f87171", warning: "#fbbf24" } as const;
 
-type Api = { run: () => void };
+type Api = { run: () => void; close: () => void };
 const w = window as unknown as Record<string, Api | undefined>;
 
 const CSS = `
@@ -81,31 +82,15 @@ function mount(): Api {
   root.append(panel);
   document.documentElement.append(host);
 
-  const outlined = new Map<HTMLElement, { outline: string; offset: string }>();
   let reports: FormReport[] = [];
   let lang: Lang = "en";
-
-  function outline(target: Element, color: string) {
-    const h = target as HTMLElement;
-    if (!h.style) return;
-    if (!outlined.has(h)) outlined.set(h, { outline: h.style.outline, offset: h.style.outlineOffset });
-    h.style.outline = `3px solid ${color}`;
-    h.style.outlineOffset = "2px";
-  }
-
-  function clearOutlines() {
-    for (const [h, prev] of outlined) {
-      h.style.outline = prev.outline;
-      h.style.outlineOffset = prev.offset;
-    }
-    outlined.clear();
-  }
+  const marker = createMarker(document, "forms");
+  const clearOutlines = () => marker.clear();
 
   function paintOutlines() {
-    for (const r of reports) {
-      for (const issue of r.issues) if (issue.severity === "error") outline(issue.element, COLORS.error);
-      for (const issue of r.issues) if (issue.severity === "warning" && !outlined.has(issue.element as HTMLElement)) outline(issue.element, COLORS.warning);
-    }
+    // Primero los errores, para que un campo con error y aviso se marque en rojo.
+    for (const r of reports) for (const i of r.issues) if (i.severity === "error") marker.mark(i.element, "error");
+    for (const r of reports) for (const i of r.issues) if (i.severity === "warning") marker.mark(i.element, "warning");
   }
 
   function close() {
@@ -145,7 +130,10 @@ function mount(): Api {
     issue.element.scrollIntoView({ block: "center", inline: "nearest" });
     host.style.display = "none";
     clearOutlines();
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 150))));
+    await Promise.race([
+      new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 150)))),
+      new Promise((r) => setTimeout(r, 400)),
+    ]);
     const box = issue.element.getBoundingClientRect();
     const message: Message = {
       type: "reportFromPage",
@@ -263,9 +251,13 @@ function mount(): Api {
   }
 
   void run();
-  return { run: () => void run() };
+  return { run: () => void run(), close };
 }
 
 // Si el panel ya está abierto, se vuelve a ejecutar en lugar de abrir otro.
+// Solo una herramienta a la vez: si el test de estrés está abierto, se cierra y deshace sus cambios.
 if (w[GLOBAL]) w[GLOBAL]!.run();
-else w[GLOBAL] = mount();
+else {
+  (window as unknown as Record<string, { close?: () => void } | undefined>)["__snagkitStress__"]?.close?.();
+  w[GLOBAL] = mount();
+}

@@ -41,6 +41,23 @@ const SIGNUP = `<!doctype html>
   </form>
 </body></html>`;
 
+/** Página con un diseño frágil: un botón de ancho fijo, una etiqueta con "…" y un menú que no se adapta. */
+const PRODUCT = `<!doctype html>
+<html lang="en"><head><title>Product</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 32px; }
+  .buy { width: 120px; height: 36px; overflow: hidden; white-space: nowrap; background: #111; color: #fff; border: 0; }
+  .tag { display: inline-block; max-width: 140px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .menu { display: flex; gap: 24px; white-space: nowrap; }
+</style></head>
+<body>
+  <nav class="menu"><a href="#">Home</a><a href="#">New arrivals</a><a href="#">Collections</a><a href="#">Contact us</a></nav>
+  <h1>Leather backpack</h1>
+  <p><span class="tag">Free shipping on every order over 50 euros</span></p>
+  <img src="/missing.png" alt="Backpack" width="200" height="120">
+  <p><button class="buy">Add to cart</button></p>
+</body></html>`;
+
 type Fixtures = { context: BrowserContext; serviceWorker: Worker; extensionId: string; baseUrl: string; submissions: string[] };
 
 export const test = base.extend<Fixtures>({
@@ -52,7 +69,9 @@ export const test = base.extend<Fixtures>({
   baseUrl: async ({ submissions }, use) => {
     const server: Server = createServer((req, res) => {
       if (req.method === "POST" && req.url === "/signup") submissions.push(req.url);
-      if (req.url === "/signup") {
+      if (req.url === "/product") {
+        res.writeHead(200, { "content-type": "text/html" }).end(PRODUCT);
+      } else if (req.url === "/signup") {
         res.writeHead(200, { "content-type": "text/html" }).end(SIGNUP);
       } else if (req.url === "/") {
         res.writeHead(200, { "content-type": "text/html" }).end(SHOP);

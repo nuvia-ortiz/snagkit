@@ -8,5 +8,6 @@ await Promise.all([
   build({ ...common, entryPoints: ["src/content/page-hooks.ts"], outfile: "dist/page-hooks.js", format: "iife" }),
   build({ ...common, entryPoints: ["src/content/recorder.ts"], outfile: "dist/recorder.js", format: "iife" }),
   build({ ...common, entryPoints: ["src/content/form-tester.ts"], outfile: "dist/form-tester.js", format: "iife" }),
+  build({ ...common, entryPoints: ["src/content/stress-tester.ts"], outfile: "dist/stress-tester.js", format: "iife" }),
 ]);
 console.log("scripts ok");

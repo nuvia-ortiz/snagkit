@@ -144,7 +144,10 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
       );
       return true;
     case "runFormTester":
-      chrome.scripting.executeScript({ target: { tabId: message.tabId }, files: ["form-tester.js"] }).then(
+    case "runStressTest":
+      chrome.scripting
+        .executeScript({ target: { tabId: message.tabId }, files: [message.type === "runFormTester" ? "form-tester.js" : "stress-tester.js"] })
+        .then(
         () => sendResponse({ ok: true }),
         (error: unknown) => sendResponse({ ok: false, error: String(error) }),
       );
