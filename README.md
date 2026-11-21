@@ -37,6 +37,7 @@ Breaks the page on purpose — longer text, emojis, missing images, larger fonts
 
 - **Typed text is never recorded.** Steps say *"Type in field Email"*, never what was typed. Passwords included.
 - **Secrets in URLs are redacted** automatically (`token`, `apiKey`, `session`, `code`… → `[redacted]`), as are credentials embedded in URLs.
+- **Records only when you say so.** Paused by default; while paused no script runs on any page.
 - **Nothing leaves your computer.** Data is kept per tab in the browser's session storage and deleted when the tab closes. Only the 20 most recent report drafts are kept.
 
 ## Install
@@ -50,9 +51,15 @@ npm install
 npm run build
 ```
 
-Then open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and select the `dist` folder. Works in Chrome, Edge, Brave and other Chromium browsers.
+Then open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and select the **`dist`** folder inside the project (not the project folder itself). Works in Chrome, Edge, Brave and other Chromium browsers.
 
-Reload any page that was already open so Snagkit can start recording it.
+## Usage
+
+1. Click the Snagkit icon and press **Start recording**. The icon shows a red **REC** badge.
+2. Use the page as usual until you find the bug.
+3. Press **Report a bug**, annotate the screenshot, add a title and export.
+
+Snagkit is **paused by default**: while paused it injects nothing into pages and stores nothing. Once started, it stays on — across tabs and browser restarts — until you press **Pause**. Starting it also begins recording tabs that are already open, no reload needed.
 
 ## How it works
 
@@ -89,6 +96,7 @@ The end-to-end test opens a sample checkout page, fills in the form, triggers a 
 ## Roadmap
 
 - [x] Bug reports with steps, console, network, environment and annotated screenshot
+- [x] Start / pause recording
 - [ ] Form tester
 - [ ] UI stress test
 - [ ] Short screen recording of the last seconds before the bug

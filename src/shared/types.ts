@@ -74,6 +74,7 @@ export type Message =
   | { type: "step"; step: Step }
   | { type: "getSession"; tabId: number }
   | { type: "clearSession"; tabId: number }
-  | { type: "createReport"; tabId: number; windowId: number };
+  | { type: "createReport"; tabId: number; windowId: number }
+  | { type: "setRecording"; on: boolean };
 
 export const LIMITS = { console: 50, network: 50, steps: 30 } as const;

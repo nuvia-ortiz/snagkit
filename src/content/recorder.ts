@@ -1,12 +1,26 @@
 // Content script aislado: graba los pasos del usuario y reenvía al service worker
 // lo que detecta page-hooks.ts. Nunca guarda lo que se escribe en los campos.
+// Solo se inyecta mientras la grabación está activa; si se pausa con la página abierta,
+// deja de enviar nada al instante.
 
 import { closestInteractive, describe } from "../shared/describe";
 import type { ConsoleEntry, Message, Step } from "../shared/types";
 
 const TAG = "__snagkit__";
+const LOADED = "__snagkitRecorder__";
+
+let active = true;
+try {
+  chrome.storage.local.get("recording").then(({ recording }) => (active = recording === true));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.recording) active = changes.recording.newValue === true;
+  });
+} catch {
+  // la extensión se recargó
+}
 
 function send(message: Message) {
+  if (!active) return;
   try {
     chrome.runtime.sendMessage(message).catch(() => {});
   } catch {
@@ -18,8 +32,11 @@ function record(step: Step) {
   send({ type: "step", step });
 }
 
-// Solo grabamos el documento principal, no iframes de anuncios o widgets.
-if (window === window.top) {
+// Solo grabamos el documento principal, no iframes de anuncios o widgets,
+// y una sola vez aunque el script se inyecte de nuevo al reactivar la grabación.
+const w = window as unknown as Record<string, boolean>;
+if (window === window.top && !w[LOADED]) {
+  w[LOADED] = true;
   record({ t: Date.now(), kind: "navigate", url: location.href });
 
   window.addEventListener("message", (event) => {

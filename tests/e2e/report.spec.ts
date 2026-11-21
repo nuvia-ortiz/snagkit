@@ -4,25 +4,43 @@ test("records a session and turns it into a bug report", async ({ context, exten
   const page = await context.newPage();
   await page.goto(baseUrl);
 
+  const tabId = await serviceWorker.evaluate(async () => (await chrome.tabs.query({ url: "http://127.0.0.1/*" }))[0].id!);
+  const session = () =>
+    serviceWorker.evaluate(async (id) => (await chrome.storage.session.get(`tab:${id}`))[`tab:${id}`], tabId) as Promise<
+      { console: unknown[]; steps: { kind: string }[] } | undefined
+    >;
+
+  // En pausa (estado inicial) no se graba nada
+  await page.getByLabel("Email").fill("ignored@example.com");
+  await page.waitForTimeout(300);
+  expect(await session()).toBeUndefined();
+
+  // Se activa desde el popup con la página ya abierta, sin recargarla
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup/index.html?tabId=${tabId}`);
+  await popup.getByRole("button", { name: "EN" }).click();
+  await expect(popup.getByText("Paused")).toBeVisible();
+  await popup.getByRole("button", { name: /Start recording/ }).click();
+  await expect(popup.getByText("Recording", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await session())?.steps.length ?? 0).toBeGreaterThan(0);
+
   // Lo que haría una persona probando la página
+  await page.bringToFront();
   await page.getByLabel("Email").fill("tester@example.com");
   await page.getByLabel("Plan").selectOption("Pro");
   await page.getByLabel("Accept terms").check();
   await page.getByRole("button", { name: "Pay now" }).click();
+  await expect.poll(async () => (await session())?.console.length ?? 0).toBeGreaterThan(0);
 
-  // Espera a que el service worker haya guardado el error de consola y la petición fallida
-  const tabId = await serviceWorker.evaluate(async () => (await chrome.tabs.query({ url: "http://127.0.0.1/*" }))[0].id!);
-  await expect
-    .poll(async () => {
-      const data = await serviceWorker.evaluate(async (id) => (await chrome.storage.session.get(`tab:${id}`))[`tab:${id}`], tabId);
-      return (data as { console?: unknown[] } | undefined)?.console?.length ?? 0;
-    })
-    .toBeGreaterThan(0);
+  // Al pausar deja de grabar al instante, aunque la página siga abierta
+  await popup.getByRole("button", { name: /Pause/ }).click();
+  await expect(popup.getByText("Paused")).toBeVisible();
+  const stepsBefore = (await session())!.steps.length;
+  await page.getByLabel("Plan").selectOption("Basic");
+  await page.waitForTimeout(300);
+  expect((await session())!.steps.length).toBe(stepsBefore);
 
-  // Popup apuntando a la pestaña de la tienda
-  const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extensionId}/popup/index.html?tabId=${tabId}`);
-  await popup.getByRole("button", { name: "EN" }).click();
+  await popup.getByRole("button", { name: /Start recording/ }).click();
   await expect(popup.getByText("Console errors")).toBeVisible();
   await popup.locator("main").screenshot({ path: "test-results/popup.png" });
 
@@ -46,7 +64,9 @@ test("records a session and turns it into a bug report", async ({ context, exten
   expect(md).toContain('Click button "Pay now"');
   expect(md).toContain("Payment failed with status 500");
   expect(md).toContain("POST 500");
-  expect(md).toContain("GET 404");
+  // La imagen rota falló al cargar la página, cuando la grabación aún estaba en pausa
+  expect(md).not.toContain("missing.png");
+  expect(md).not.toContain("Basic");
 
   // Privacidad: ni lo escrito en el formulario ni el token de la URL aparecen en el reporte
   expect(md).not.toContain("tester@example.com");

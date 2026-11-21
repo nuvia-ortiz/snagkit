@@ -25,6 +25,7 @@ export function Popup() {
   const [session, setSession] = useState<TabSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [recording, setRecording] = useState<boolean | null>(null);
 
   const supported = !!tab?.url && /^(https?|file):/.test(tab.url);
 
@@ -41,7 +42,23 @@ export function Popup() {
       setTab(current ?? null);
       if (current) void load(current);
     });
+    chrome.storage.local.get("recording").then(({ recording: on }) => setRecording(on === true));
   }, [load]);
+
+  // Contadores en vivo mientras el popup está abierto.
+  useEffect(() => {
+    if (!tab || !recording) return;
+    const timer = window.setInterval(() => void load(tab), 1000);
+    return () => window.clearInterval(timer);
+  }, [tab, recording, load]);
+
+  const toggleRecording = async () => {
+    const on = !recording;
+    setRecording(on);
+    setNotice("");
+    await send({ type: "setRecording", on });
+    if (tab) window.setTimeout(() => void load(tab), 300);
+  };
 
   const report = async () => {
     if (!tab?.id || tab.windowId === undefined) return;
@@ -95,7 +112,27 @@ export function Popup() {
             <Stat label={t.steps} value={session?.steps.length ?? 0} tone="accent" />
           </div>
 
-          {session && session.steps.length === 0 && <p className="mt-3 text-xs text-warn">{t.reloadHint}</p>}
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-line bg-panel px-3 py-2.5">
+            <span className="flex items-center gap-2 text-sm" role="status">
+              <span className="relative flex h-2.5 w-2.5">
+                {recording && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:hidden" />}
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${recording ? "bg-red-500" : "bg-zinc-600"}`} />
+              </span>
+              <span className={recording ? "font-medium text-zinc-100" : "text-zinc-400"}>{recording ? t.recordingOn : t.recordingOff}</span>
+            </span>
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={recording === null}
+              aria-pressed={!!recording}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                recording ? "border border-line text-zinc-200 hover:border-zinc-500" : "bg-red-500 text-white hover:bg-red-400"
+              }`}
+            >
+              {recording ? `❚❚ ${t.pause}` : `● ${t.start}`}
+            </button>
+          </div>
+          {recording !== null && <p className="mt-2 text-xs leading-relaxed text-zinc-500">{recording ? t.recordingHint : t.pausedHint}</p>}
 
           <button
             type="button"

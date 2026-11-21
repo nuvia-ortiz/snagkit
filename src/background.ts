@@ -37,20 +37,89 @@ async function clearSession(tabId: number) {
   await chrome.storage.session.remove(key(tabId));
 }
 
+// ── Grabación: encendida o en pausa ───────────────────────────────────────────
+// En pausa no se inyecta nada en las páginas ni se guarda nada. Encendida, se queda
+// así (también tras reiniciar el navegador) hasta que la persona la pausa.
+
+const SCRIPTS: chrome.scripting.RegisteredContentScript[] = [
+  { id: "page-hooks", js: ["page-hooks.js"], matches: ["<all_urls>"], runAt: "document_start", world: "MAIN" },
+  { id: "recorder", js: ["recorder.js"], matches: ["<all_urls>"], runAt: "document_start" },
+];
+
+let recording = false;
+const ready = chrome.storage.local.get("recording").then(({ recording: saved }) => {
+  recording = saved === true;
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.recording) recording = changes.recording.newValue === true;
+});
+
+async function showBadge(on: boolean) {
+  await chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+  await chrome.action.setBadgeTextColor?.({ color: "#ffffff" });
+  await chrome.action.setBadgeText({ text: on ? "REC" : "" });
+}
+
+/** Deja los content scripts registrados solo si la grabación está encendida. */
+async function syncScripts(on: boolean) {
+  const existing = await chrome.scripting.getRegisteredContentScripts();
+  if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: existing.map((s) => s.id) });
+  if (on) await chrome.scripting.registerContentScripts(SCRIPTS);
+}
+
+/** Al encender, las pestañas que ya estaban abiertas empiezan a grabar sin tener que recargarlas. */
+async function injectIntoOpenTabs() {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  await Promise.all(
+    tabs.map(async (tab) => {
+      if (tab.id === undefined) return;
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["page-hooks.js"], world: "MAIN" });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["recorder.js"] });
+      } catch {
+        // páginas protegidas (Chrome Web Store, visor de PDF…): se ignoran
+      }
+    }),
+  );
+}
+
+async function setRecording(on: boolean) {
+  await chrome.storage.local.set({ recording: on });
+  recording = on;
+  await syncScripts(on);
+  await showBadge(on);
+  if (on) await injectIntoOpenTabs();
+}
+
+// Al instalar o actualizar la extensión se reconstruye el estado guardado.
+chrome.runtime.onInstalled.addListener(async () => {
+  await ready;
+  await syncScripts(recording);
+  await showBadge(recording);
+});
+chrome.runtime.onStartup.addListener(async () => {
+  await ready;
+  await showBadge(recording);
+});
+
 // ── Red: peticiones con error HTTP o que no llegaron a completarse ─────────────
 const FILTER: chrome.webRequest.RequestFilter = { urls: ["<all_urls>"] };
 
 function isFromPage(d: { tabId: number; initiator?: string }) {
-  return d.tabId >= 0 && !d.initiator?.startsWith("chrome-extension://");
+  return recording && d.tabId >= 0 && !d.initiator?.startsWith("chrome-extension://");
 }
 
-chrome.webRequest.onCompleted.addListener((d) => {
+// El service worker puede despertar justo por una petición: se espera a saber si se graba.
+chrome.webRequest.onCompleted.addListener(async (d) => {
+  await ready;
   if (!isFromPage(d) || d.statusCode < 400) return;
   const entry: NetworkEntry = { t: Date.now(), method: d.method, url: d.url, status: d.statusCode, type: d.type };
   void update(d.tabId, (s) => addEntry(s, "network", entry));
 }, FILTER);
 
-chrome.webRequest.onErrorOccurred.addListener((d) => {
+chrome.webRequest.onErrorOccurred.addListener(async (d) => {
+  await ready;
   // Las peticiones canceladas a propósito (navegar a otra página, abortar un fetch) no son fallos.
   if (!isFromPage(d) || d.error === "net::ERR_ABORTED") return;
   const entry: NetworkEntry = { t: Date.now(), method: d.method, url: d.url, status: 0, error: d.error, type: d.type };
@@ -62,11 +131,17 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
   const tabId = sender.tab?.id;
   switch (message.type) {
     case "console":
-      if (tabId !== undefined) void update(tabId, (s) => addEntry(s, "console", message.entry));
+      if (tabId !== undefined) void ready.then(() => (recording ? update(tabId, (s) => addEntry(s, "console", message.entry)) : undefined));
       return false;
     case "step":
-      if (tabId !== undefined) void update(tabId, (s) => addStep(s, message.step));
+      if (tabId !== undefined) void ready.then(() => (recording ? update(tabId, (s) => addStep(s, message.step)) : undefined));
       return false;
+    case "setRecording":
+      setRecording(message.on).then(
+        () => sendResponse(true),
+        (error: unknown) => sendResponse({ error: String(error) }),
+      );
+      return true;
     case "getSession":
       void queue.then(() => getSession(message.tabId)).then(sendResponse);
       return true;
