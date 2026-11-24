@@ -4,6 +4,8 @@
 
 Everything runs locally. Snagkit has no server, no account and makes no network requests of its own.
 
+**Figma file:** [the popup, the bug report and the form tester as editable Figma layers](https://www.figma.com/design/ObmWMEsx92GUrq2tEvKYsf/Snagkit-Diseno-de-la-extension) (view-only).
+
 <p align="center">
   <img src="docs/popup.png" alt="Snagkit popup showing console errors, failed requests and recorded steps" width="300">
 </p>

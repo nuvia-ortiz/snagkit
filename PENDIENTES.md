@@ -13,3 +13,7 @@ Revisado el 23-nov-2026.
 ## Otros
 3. **Rellenar el campo «Website» del repositorio** en GitHub (vacío). Cuando esté en la Store, poner ahí el enlace.
 4. **Publicar un ZIP compilado en GitHub Releases**, para poder probarla sin compilar mientras no esté en la Store.
+
+## Diseño en Figma
+- Archivo público de solo lectura con las pantallas reales como capas editables (24-nov-2026): https://www.figma.com/design/ObmWMEsx92GUrq2tEvKYsf/Snagkit-Diseno-de-la-extension
+- Enlazado en el README y en la web portfolio.
